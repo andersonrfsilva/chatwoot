@@ -23,15 +23,18 @@ class Conversations::EventDataPresenter < SimpleDelegator
 
   # Like #push_data but with message text normalized for external integrations (webhooks).
   def webhook_data
-    push_data.merge(
-      account: account.webhook_data,
-      messages: webhook_push_messages
-    )
+    @webhook_payload = true
+    push_data.merge(account: account.webhook_data)
+  ensure
+    @webhook_payload = false
   end
 
   private
 
   def push_messages
+    # chatwoot-lite: Avoid building the push representation that webhooks discard.
+    return webhook_push_messages if @webhook_payload
+
     [messages.where(account_id: account_id).chat.last&.push_event_data].compact
   end
 

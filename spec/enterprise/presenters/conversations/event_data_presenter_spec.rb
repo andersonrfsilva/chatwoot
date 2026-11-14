@@ -26,4 +26,12 @@ RSpec.describe Conversations::EventDataPresenter do
       expect(presenter.push_data).not_to include(:applied_sla, :sla_events)
     end
   end
+
+  describe '#webhook_data' do
+    it 'includes the applied SLA when the feature is enabled' do
+      conversation.account.enable_features!('sla')
+
+      expect(presenter.webhook_data).to include(applied_sla: applied_sla.push_event_data)
+    end
+  end
 end

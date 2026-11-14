@@ -46,6 +46,36 @@ RSpec.describe Conversations::EventDataPresenter do
   end
 
   describe '#webhook_data' do
+    it 'loads the last chat message once for webhook data' do
+      create(:message, conversation: conversation, account: conversation.account, message_type: :outgoing)
+      queries = []
+      subscriber = lambda do |_name, _start, _finish, _id, payload|
+        queries << payload[:sql] if payload[:name] == 'Message Load' && payload[:sql].include?('"messages"."private"')
+      end
+
+      ActiveRecord::Base.uncached do
+        ActiveSupport::Notifications.subscribed(subscriber, 'sql.active_record') { presenter.webhook_data }
+      end
+
+      expect(queries.size).to eq(1)
+    end
+
+    it 'restores the push message representation after webhook data' do
+      create(:message, conversation: conversation, account: conversation.account,
+                       message_type: :outgoing, content: "Hello\\\nWorld")
+      presenter.webhook_data
+
+      expect(presenter.push_data[:messages].first[:content]).to eq("Hello\\\nWorld")
+    end
+
+    it 'preserves the message key position and appends account' do
+      push_keys = presenter.push_data.keys
+      webhook_keys = presenter.webhook_data.keys
+
+      expect(webhook_keys.last).to eq(:account)
+      expect(webhook_keys.index(:messages)).to eq(push_keys.index(:messages))
+    end
+
     it 'includes account details for webhook consumers' do
       expect(presenter.webhook_data[:account]).to eq(conversation.account.webhook_data)
     end
